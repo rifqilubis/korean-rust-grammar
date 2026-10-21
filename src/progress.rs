@@ -66,6 +66,20 @@ fn preferred_dir() -> PathBuf {
                 .join("kg-korean");
         }
     }
+    if cfg!(target_os = "android") {
+        // Termux menyetel HOME; `adb shell` biasanya hanya punya TMPDIR.
+        if let Ok(home) = std::env::var("HOME") {
+            if !home.trim().is_empty() {
+                return PathBuf::from(home).join(".kg-korean");
+            }
+        }
+        if let Ok(tmp) = std::env::var("TMPDIR") {
+            if !tmp.trim().is_empty() {
+                return PathBuf::from(tmp).join("kg-korean");
+            }
+        }
+        return PathBuf::from("/data/local/tmp").join("kg-korean");
+    }
     if let Ok(xdg) = std::env::var("XDG_DATA_HOME") {
         if !xdg.trim().is_empty() {
             return PathBuf::from(xdg).join("kg-korean");

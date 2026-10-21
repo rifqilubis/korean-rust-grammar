@@ -18,8 +18,8 @@ Aplikasi terminal untuk belajar **tata bahasa Korea (한국어 문법)**, dituli
 
 | Bahasa | Baris kode | Porsi |
 |---|---:|---:|
-| **Rust** (`.rs`) | ~4.100 | **±97%** |
-| Konfigurasi & dokumentasi (TOML, Markdown, `.gitignore`) | ~140 | ±3% |
+| **Rust** (`.rs`) | ~4.600 | **±97%** |
+| Konfigurasi & dokumentasi (TOML, Markdown, `.gitignore`) | ~200 | ±3% |
 
 Tidak ada JavaScript, Python, atau skrip lain di folder ini — seluruh logika aplikasi, data materi, penyimpanan progres, sampai penulisan tabel terminal dikerjakan Rust.
 
@@ -90,15 +90,81 @@ korean-rust-grammar/
 │   ├── progress.rs   # simpan/muat progres JSON + fallback folder
 │   ├── json.rs       # parser & penulis JSON mini
 │   ├── rng.rs        # xorshift64* untuk pengacakan
-│   └── ui.rs         # warna ANSI, lebar CJK, panel, tabel, progress bar
+│   ├── ui.rs         # warna ANSI, lebar CJK, panel, tabel, progress bar
+│   └── bin/
+│       └── xtask.rs  # task runner: build Android semua ABI
 └── tests/
     └── cli_integration.rs   # uji end-to-end biner `kg`
 ```
 
+## Android
+
+Biner `kg` bisa di-cross-compile ke Android dan dijalankan sebagai CLI di
+**Termux** atau lewat `adb shell`. Ini bukan APK — lihat catatan di bawah.
+
+```bash
+# 1. Pasang target Rust (sekali saja)
+rustup target add aarch64-linux-android armv7-linux-androideabi \
+                   x86_64-linux-android i686-linux-android
+
+# 2. Set lokasi NDK (kalau tidak terdeteksi otomatis)
+export ANDROID_NDK_HOME="$HOME/Android/Sdk/ndk/27.0.12077973"   # Linux/macOS
+# $env:ANDROID_NDK_HOME = "$env:LOCALAPPDATA\Android\Sdk\ndk\27.0.12077973"  # Windows
+
+# 3. Build
+cargo run --bin xtask -- android              # semua ABI
+cargo run --bin xtask -- android --abi arm64  # hanya arm64-v8a
+```
+
+Hasil build per ABI (ukuran release, NDK r27, API 21):
+
+| ABI | Target triple | Ukuran |
+|---|---|---:|
+| arm64-v8a | `aarch64-linux-android` | ~505 KB |
+| armeabi-v7a | `armv7-linux-androideabi` | ~376 KB |
+| x86_64 | `x86_64-linux-android` | ~554 KB |
+| x86 | `i686-linux-android` | ~547 KB |
+
+Biner ditautkan ke `bionic` (`/system/bin/linker64`), bukan GLIBC, sehingga
+tidak butuh `proot` untuk urusan pustaka.
+
+### Menjalankan di perangkat
+
+```bash
+# Termux (paling praktis, tanpa root)
+adb push target/aarch64-linux-android/release/kg /sdcard/kg
+# lalu di Termux:
+cp /sdcard/kg ~/ && chmod +x ~/kg && ~/kg
+
+# atau langsung lewat adb (cocok untuk uji cepat)
+adb push target/aarch64-linux-android/release/kg /data/local/tmp/kg
+adb shell chmod +x /data/local/tmp/kg
+adb shell /data/local/tmp/kg list
+```
+
+Karena aplikasi ini CLI, tampilan tabel dan kuis bekerja di terminal Termux
+(lebar layar ponsel ±40–60 kolom; gunakan `KG_COLUMNS=48` bila tabel terpotong).
+Progres disimpan di `$HOME/.kg-korean/` pada Termux, atau di `$TMPDIR` /
+`/data/local/tmp` saat dijalankan lewat `adb shell`.
+
+### Kalau ingin APK sungguhan
+
+Biner ini adalah CLI, jadi belum punya antarmuka sentuh. Dua jalur:
+
+1. **Tauri 2** — bungkus `korean_rust_grammar` sebagai pustaka, sediakan
+   perintah `#[tauri::command]` (mis. `quiz_answer`, `list_topics`) dan
+   frontend HTML. Cara ini dipakai proyek `korean-grammar` di repo sebelah.
+2. **JNI** — kompilasi `libkorean_rust_grammar.so` per ABI, panggil dari
+   `MainActivity` lewat `System.loadLibrary`.
+
+Seluruh logika inti (`data`, `quiz`, `hangul`, `progress`, `json`) sudah
+berupa pustaka murni tanpa I/O terminal, jadi siap dipakai ulang oleh
+frontend apa pun.
+
 ## Pengujian
 
 ```bash
-cargo test          # 87 tes: unit, integrasi biner, dan doc-test
+cargo test          # 90 tes: unit, integrasi biner, xtask, dan doc-test
 cargo clippy --all-targets
 cargo fmt --check
 ```

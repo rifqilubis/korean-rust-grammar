@@ -58,13 +58,7 @@ pub fn color_enabled() -> bool {
     is_tty()
 }
 
-#[cfg(windows)]
-fn is_tty() -> bool {
-    use std::io::IsTerminal;
-    io::stdout().is_terminal()
-}
-
-#[cfg(not(windows))]
+/// Apakah stdout terhubung ke terminal.
 fn is_tty() -> bool {
     use std::io::IsTerminal;
     io::stdout().is_terminal()
