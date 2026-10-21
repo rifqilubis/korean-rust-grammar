@@ -3,6 +3,19 @@
 **/*.rs.bk
 *.pdb
 
+# Build Android: hasil cargo-apk dan konfigurasi linker yang dihasilkan skrip
+/android/target
+/android/.cargo/config.toml
+
+# Kunci penandatanganan (jangan pernah di-commit)
+/.keystore
+*.jks
+keystore.properties
+
+# APK hasil build
+/build
+*.apk
+
 # Folder data progres lokal (fallback saat %APPDATA% tidak bisa ditulisi)
 /.kg-data
 
@@ -10,3 +23,6 @@
 .vscode/
 .idea/
 *.swp
+
+# Berkas sementara untuk pesan commit
+.git-commit-msg.tmp

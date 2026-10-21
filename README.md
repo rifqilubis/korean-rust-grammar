@@ -18,19 +18,23 @@ Aplikasi terminal untuk belajar **tata bahasa Korea (한국어 문법)**, dituli
 
 | Bahasa | Baris kode | Porsi |
 |---|---:|---:|
-| **Rust** (`.rs`) | ~4.600 | **±97%** |
-| Konfigurasi & dokumentasi (TOML, Markdown, `.gitignore`) | ~200 | ±3% |
+| **Rust** (`.rs`) | ~5.600 | **±92%** |
+| Konfigurasi, dokumentasi & skrip build (TOML, Markdown, PowerShell) | ~460 | ±8% |
 
-Tidak ada JavaScript, Python, atau skrip lain di folder ini — seluruh logika aplikasi, data materi, penyimpanan progres, sampai penulisan tabel terminal dikerjakan Rust.
+Tidak ada JavaScript, Python, Java, atau Kotlin di folder ini — seluruh logika
+aplikasi, data materi, penyimpanan progres, penulisan tabel terminal, sampai
+antarmuka APK (digambar `egui`) dikerjakan Rust. Satu-satunya berkas non-Rust di
+dalam APK adalah `AndroidManifest.xml` yang dihasilkan `cargo-apk`.
 
 ## Fitur
 
 - **12 topik materi** dari 한글 sampai penghubung kalimat, lengkap dengan tabel aturan, contoh, catatan, dan 39 soal kuis.
 - **Mesin kuis interaktif** dengan pengacakan soal & opsi, penilaian langsung, serta rekap kesalahan di akhir sesi.
+- **APK Android** dengan antarmuka sentuh — tanpa Gradle, tanpa Java/Kotlin, tanpa WebView (lihat bagian [Android](#android)).
 - **Penyimpanan progres** dalam JSON di direktori data pengguna (otomatis mundur ke `.kg-data` bila folder standar tidak bisa ditulisi).
 - **Modul 한글 sungguhan**: dekomposisi 초성/중성/종성, komposisi balik, romanisasi dengan aturan 연음 (resyllabification) dan 비음화 (asimilasi hidung).
 - **Tabel sadar lebar CJK** — suku kata 한글 dihitung 2 kolom sehingga tabel tetap rapi.
-- **Tanpa dependensi**: parser JSON, PRNG xorshift64\*, dan pewarnaan ANSI ditulis sendiri di atas `std`.
+- **Inti tanpa dependensi**: parser JSON, PRNG xorshift64\*, dan pewarnaan ANSI ditulis sendiri di atas `std`. Dependensi UI hanya ada di crate `android/`.
 
 ## Instalasi
 
@@ -92,15 +96,71 @@ korean-rust-grammar/
 │   ├── rng.rs        # xorshift64* untuk pengacakan
 │   ├── ui.rs         # warna ANSI, lebar CJK, panel, tabel, progress bar
 │   └── bin/
-│       └── xtask.rs  # task runner: build Android semua ABI
+│       └── xtask.rs  # task runner: build Android CLI semua ABI
+├── android/          # crate APK: antarmuka egui (Rust murni)
+│   ├── Cargo.toml    # metadata APK: paket, ABI, minSdk, ikon
+│   ├── src/
+│   │   ├── lib.rs    # titik masuk `android_main` + `run`
+│   │   ├── app.rs    # layar beranda/materi/kuis/hasil/progres
+│   │   ├── font.rs   # menanam NanumGothic untuk glif 한글
+│   │   ├── theme.rs  # palet terang/gelap + gaya widget sentuh
+│   │   └── bin/
+│   │       └── desktop.rs   # uji UI yang sama di desktop
+│   └── res/          # ikon launcher per densitas
+├── assets/fonts/     # NanumGothic-Regular.ttf + OFL.txt
+├── tools/
+│   └── build-apk.ps1 # cari SDK/NDK/JDK, tulis config, build + tanda tangan
 └── tests/
     └── cli_integration.rs   # uji end-to-end biner `kg`
 ```
 
 ## Android
 
-Biner `kg` bisa di-cross-compile ke Android dan dijalankan sebagai CLI di
-**Termux** atau lewat `adb shell`. Ini bukan APK — lihat catatan di bawah.
+Ada dua jalur Android di repo ini:
+
+1. **APK sungguhan** dengan antarmuka sentuh (crate `android/`, lihat di bawah).
+2. **Biner CLI** `kg` yang dijalankan di **Termux** atau lewat `adb shell`.
+
+### 1. APK (antarmuka sentuh, Rust murni)
+
+Crate `android/` membangun APK tanpa Gradle, tanpa Java/Kotlin, dan tanpa
+WebView/HTML/CSS/JS. Antarmuka digambar `egui` di atas OpenGL lewat `eframe`;
+`Activity` yang dipakai adalah `android.app.NativeActivity` bawaan Android yang
+memuat `libkorean_rust_grammar_android.so`.
+
+```powershell
+# Windows (PowerShell) — cari SDK/NDK/JDK sendiri, lalu build + tanda tangan
+powershell -ExecutionPolicy Bypass -File tools/build-apk.ps1
+
+# hanya satu ABI (jauh lebih cepat saat mengembangkan)
+powershell -ExecutionPolicy Bypass -File tools/build-apk.ps1 -Target aarch64-linux-android
+
+# build debug (tanpa optimasi, APK besar, memakai kunci debug NDK)
+powershell -ExecutionPolicy Bypass -File tools/build-apk.ps1 -Debug
+```
+
+Hasil: `android/target/release/apk/korean-rust-grammar.apk` (±8,5 MB, tiga ABI:
+arm64-v8a, armeabi-v7a, x86_64). Paketnya `com.rifqilubis.koreanrustgrammar`,
+minSdk 24, targetSdk 34.
+
+Prasyarat: Rust + `cargo-apk`, Android SDK (build-tools + platform 34), NDK r27,
+dan JDK 17. Skrip membuat `android/.cargo/config.toml` sendiri dari lokasi NDK,
+jadi berkas itu tidak perlu di-commit.
+
+Isi APK: satu-satunya kode non-Rust adalah `AndroidManifest.xml` yang
+dihasilkan `cargo-apk`. Tidak ada WebView, tidak ada berkas aset terpisah —
+materi dan huruf Korea (NanumGothic, OFL) ditanam ke dalam biner lewat
+`include_bytes!`.
+
+Layarnya: **beranda** (12 topik + progres), **materi** (tabel aturan, contoh,
+catatan), **kuis** (soal, penilaian langsung, pembahasan), **hasil** (skor,
+daftar kesalahan, ulangi), dan **progres**. Progres disimpan di folder data
+aplikasi Android (`internal_data_path`), yang diteruskan ke pustaka inti lewat
+`KG_DATA_DIR`.
+
+### 2. Biner CLI di Termux / adb
+
+Biner `kg` juga bisa di-cross-compile ke Android dan dijalankan sebagai CLI:
 
 ```bash
 # 1. Pasang target Rust (sekali saja)
@@ -147,27 +207,28 @@ Karena aplikasi ini CLI, tampilan tabel dan kuis bekerja di terminal Termux
 Progres disimpan di `$HOME/.kg-korean/` pada Termux, atau di `$TMPDIR` /
 `/data/local/tmp` saat dijalankan lewat `adb shell`.
 
-### Kalau ingin APK sungguhan
+### Kalau ingin APK dengan WebView
 
-Biner ini adalah CLI, jadi belum punya antarmuka sentuh. Dua jalur:
-
-1. **Tauri 2** — bungkus `korean_rust_grammar` sebagai pustaka, sediakan
-   perintah `#[tauri::command]` (mis. `quiz_answer`, `list_topics`) dan
-   frontend HTML. Cara ini dipakai proyek `korean-grammar` di repo sebelah.
-2. **JNI** — kompilasi `libkorean_rust_grammar.so` per ABI, panggil dari
-   `MainActivity` lewat `System.loadLibrary`.
-
-Seluruh logika inti (`data`, `quiz`, `hangul`, `progress`, `json`) sudah
-berupa pustaka murni tanpa I/O terminal, jadi siap dipakai ulang oleh
-frontend apa pun.
+APK di `android/` sudah berupa aplikasi asli tanpa WebView. Bila nanti ingin
+antarmuka berbasis HTML (mis. berbagi kode dengan versi web), jalur Tauri 2
+tetap terbuka: bungkus `korean_rust_grammar` sebagai pustaka, sediakan perintah
+`#[tauri::command]` (mis. `quiz_answer`, `list_topics`), lalu frontend HTML.
+Seluruh logika inti (`data`, `quiz`, `hangul`, `progress`, `json`) sudah berupa
+pustaka murni tanpa I/O terminal, jadi siap dipakai ulang frontend apa pun.
 
 ## Pengujian
 
 ```bash
-cargo test          # 90 tes: unit, integrasi biner, xtask, dan doc-test
+cargo test                      # 90 tes inti: unit, integrasi biner, xtask, doc-test
+cd android && cargo test        # 4 tes antarmuka APK tanpa jendela
 cargo clippy --all-targets
 cargo fmt --check
 ```
+
+Uji di `android/` menjalankan bingkai `egui` sungguhan lewat
+`Context::run_ui` tanpa membuka jendela: seluruh layar digambar (beranda, 12
+layar materi, kuis, hasil, progres), alur kuis dijawab sampai selesai untuk
+memastikan progres tercatat, dan umpan balik jawaban salah muncul.
 
 Yang diuji antara lain: round-trip dekomposisi seluruh 11.172 suku kata 한글, aturan romanisasi (연음, pemecahan gugus konsonan, penghilangan ㅎ, 비음화), kesesuaian romanisasi otomatis dengan 48 contoh di bank materi, integritas bank soal (semua jawaban valid, tidak ada opsi kosong), pengacakan opsi yang tidak menghilangkan jawaban, penilaian kuis, penyimpanan progres, parser JSON (termasuk escape `\uXXXX` dan surrogate pair), perhitungan lebar CJK, serta setiap perintah CLI lewat stdin/stdout tiruan dan proses biner sungguhan.
 
