@@ -1,0 +1,12 @@
+# Berkas hasil build Rust
+/target
+**/*.rs.bk
+*.pdb
+
+# Folder data progres lokal (fallback saat %APPDATA% tidak bisa ditulisi)
+/.kg-data
+
+# Berkas IDE
+.vscode/
+.idea/
+*.swp

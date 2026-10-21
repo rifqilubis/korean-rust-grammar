@@ -1,0 +1,27 @@
+[package]
+name = "korean-rust-grammar"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.70"
+description = "Pelajaran tata bahasa Korea di terminal — ditulis sepenuhnya dengan Rust, tanpa dependensi eksternal."
+license = "MIT"
+readme = "README.md"
+keywords = ["korean", "grammar", "cli", "education"]
+categories = ["command-line-utilities", "education"]
+
+[lib]
+name = "korean_rust_grammar"
+path = "src/lib.rs"
+
+[[bin]]
+name = "kg"
+path = "src/main.rs"
+
+[dependencies]
+# Sengaja kosong: seluruh fitur (JSON, PRNG, romanisasi, tabel) ditulis
+# memakai std saja agar proyek bisa di-build di mesin tanpa akses crates.io.
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
